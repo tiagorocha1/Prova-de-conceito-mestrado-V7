@@ -1,0 +1,25 @@
+fastapi==0.95.2
+uvicorn
+pymongo==4.3.3
+deepface==0.0.93
+Pillow==9.5.0
+python-multipart==0.0.5
+tensorflow
+tf-keras
+numpy<2
+python-dotenv
+pytest
+mediapipe
+dlib 
+opencv-python
+minio 
+aio_pika
+celery
+python-jose
+passlib[bcrypt]
+
+#pip install protobuf==3.20.1
+#$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION="python"
+#pip install protobuf==3.20.3
+
+
