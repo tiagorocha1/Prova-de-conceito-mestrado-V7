@@ -38,7 +38,7 @@ OUTPUT_FOLDER_DETECTIONS = os.getenv('OUTPUT_FOLDER_DETECTIONS')
 MONGO_URI                = os.getenv('MONGO_URI')
 MONGO_DB_NAME            = os.getenv('MONGO_DB_NAME')
 
-MIN_DETECTION_CONFIDENCE = 0.5   # confiança mínima MediaPipe
+MIN_DETECTION_CONFIDENCE = 0.70   # confiança mínima MediaPipe
 MIN_FACE_WIDTH           = 60    # px
 MIN_FACE_HEIGHT          = 60    # px
 
@@ -169,7 +169,14 @@ def process_image(image_bytes: bytes, image_name: str):
 
     h, w = img.shape[:2]
     detections = []
-    for det in results.detections:
+    for i, det in enumerate(results.detections):
+
+        score = det.score[0]
+        print(f"– Detecção {i}: confidence = {score:.2f}")
+        if score < MIN_DETECTION_CONFIDENCE:
+            # pula detecções fracas
+            continue
+
         rel_bb = det.location_data.relative_bounding_box
         x1 = max(0, int(rel_bb.xmin * w))
         y1 = max(0, int(rel_bb.ymin * h))
