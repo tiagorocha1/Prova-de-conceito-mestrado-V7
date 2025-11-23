@@ -249,7 +249,7 @@ def process_face(image: Image.Image, tag_video: str) -> dict:
     similarity_value = None
     if match_found:
         try:
-            similarity_value = matched_distance
+            similarity_value = 1 - matched_distance
         except Exception:
             similarity_value = None
 
