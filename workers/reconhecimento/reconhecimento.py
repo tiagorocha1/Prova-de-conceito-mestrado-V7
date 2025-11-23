@@ -51,6 +51,21 @@ db = client[MONGO_DB_NAME]
 pessoas = db["pessoas"]
 presencas = db["presencas"]
 
+
+# -------------------------------
+# Índices MongoDB (otimização de performance)
+# -------------------------------
+try:
+    # Índice composto: tag_video + last_appearance (otimiza buscas e ordenação)
+    pessoas.create_index(
+        [("tag_video", 1), ("last_appearance", -1)],
+        name="idx_tag_video_lastappearance",
+        background=True  # cria em background, sem travar o banco
+    )
+    logger.info("✅ Índice 'idx_tag_video_lastappearance' verificado/criado com sucesso.")
+except Exception as e:
+    logger.error(f"❌ Erro ao criar índice MongoDB: {e}")
+
 # Conexão ao MinIO
 minio_client = Minio(
     MINIO_ENDPOINT,
@@ -123,7 +138,7 @@ def upload_image_to_minio(image: Image.Image, uuid_str: str) -> str:
 # -------------------------------
 # Processamento da Face com Embeddings
 # -------------------------------
-def process_face(image: Image.Image) -> dict:
+def process_face(image: Image.Image, tag_video: str) -> dict:
     """Processa a imagem da face e realiza o reconhecimento."""
     start_time = datetime.now().timestamp()
     logger.info(f"Iniciando processamento da face em {start_time}")
@@ -139,11 +154,21 @@ def process_face(image: Image.Image) -> dict:
     #     "embeddings": {"$exists": True, "$ne": None, "$ne": []}
     # }))
 
+    #known_people = list(
+    #pessoas.find({
+     #   "embeddings": {"$exists": True, "$ne": []}
+    #}).sort("last_appearance", -1)  # do mais recente para o mais antigo
+    #)
+
     known_people = list(
-    pessoas.find({
-        "embeddings": {"$exists": True, "$ne": []}
-    }).sort("last_appearance", -1)  # do mais recente para o mais antigo
-)
+    pessoas.find(
+            {
+                "tag_video": tag_video,
+                "embeddings": {"$exists": True, "$ne": []}
+            },
+            projection={"uuid": 1, "embeddings": 1, "last_appearance": 1}
+        ).sort("last_appearance", -1)
+    )
 
     match_found = False
     matched_uuid = None
@@ -156,15 +181,16 @@ def process_face(image: Image.Image) -> dict:
 
         for stored_embedding in stored_embeddings:
             try:
-               # result = DeepFace.verify(
-               #     img1_path=new_embedding,
-               #     img2_path=stored_embedding,
-               #     enforce_detection=False,
-               #     model_name=MODEL_NAME
-               # )
-                dist_cos = cosine_distance(new_embedding, stored_embedding)
-                #if result["distance"] < SIMILARITY_THRESHOLD:
-                if dist_cos < SIMILARITY_THRESHOLD:
+                result = DeepFace.verify(
+                    img1_path=new_embedding,
+                    img2_path=stored_embedding,
+                    enforce_detection=False,
+                    model_name=MODEL_NAME
+                )
+                
+                #dist_cos = cosine_distance(new_embedding, stored_embedding)
+                if result["distance"] < SIMILARITY_THRESHOLD:
+                #if dist_cos < SIMILARITY_THRESHOLD:
                     match_count += 1
                     logger.info(f"Match {match_count} encontrado para UUID: {person_uuid}")
                     if (match_count / total_imagens) >= 0.2:
@@ -185,7 +211,8 @@ def process_face(image: Image.Image) -> dict:
             "uuid": matched_uuid,
             "image_paths": [],
             "embeddings": [],
-            "tags": [matched_uuid]
+            "tags": [matched_uuid],
+            "tag_video": tag_video
         })
         logger.info(f"🆕 Nova face cadastrada - UUID: {matched_uuid}")
 
@@ -216,6 +243,14 @@ def process_face(image: Image.Image) -> dict:
     finish_time = datetime.now().timestamp()
     processing_time = finish_time - start_time
 
+
+    similarity_value = None
+    if match_found:
+        try:
+            similarity_value = result["distance"]
+        except Exception:
+            similarity_value = None
+
     return {
         "uuid": matched_uuid,
         "tags": pessoa.get("tags", []),
@@ -223,7 +258,8 @@ def process_face(image: Image.Image) -> dict:
         "reconhecimento_path": minio_path,
         "inicio": start_time,
         "fim": finish_time,
-        "tempo_processamento": processing_time
+        "tempo_processamento": processing_time,
+        "similarity_value":  similarity_value
     }
 
 # -------------------------------
@@ -262,7 +298,7 @@ def callback(ch, method, properties, body):
 
 
         # Envia o processamento da face para o pool de processos
-        future = executor.submit(process_face, image)
+        future = executor.submit(process_face, image, tag_video)
         result = future.result()
 
         # Cria a mensagem de saída com os dados processados
@@ -285,7 +321,7 @@ def callback(ch, method, properties, body):
             "tempo_espera_deteccao_reconhecimento": tempo_espera_deteccao_reconhecimento,
             "inicio_reconhecimento": inicio_reconhecimento,
             "fim_reconhecimento": datetime.now().timestamp(),
-
+            "similarity_value": result["similarity_value"]
         })
 
         # Envia para a fila "reconhecimentos"

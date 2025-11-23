@@ -98,15 +98,15 @@ def salvar_frame_sem_faces(frame_uuid: str, tag_video: str, duracao: float = Non
 # ----------------------------------------
 # Filtro de tamanhos e landmarks
 # ----------------------------------------
-def filtros(index: int, facial_area: dict) -> bool:
-    w, h = facial_area.get("w", 0), facial_area.get("h", 0)
-    if w < MIN_FACE_WIDTH or h < MIN_FACE_HEIGHT:
-        print(f"⚠️ Face {index} ignorada por ser muito pequena (w={w}, h={h})")
-        return True
-    if not (facial_area.get("left_eye") and facial_area.get("right_eye")):
-        print(f"⚠️ Face {index} ignorada por falta dos landmarks dos dois olhos.")
-        return True
-    return False
+#def filtros(index: int, facial_area: dict) -> bool:
+#    w, h = facial_area.get("w", 0), facial_area.get("h", 0)
+#    if w < MIN_FACE_WIDTH or h < MIN_FACE_HEIGHT:
+#        print(f"⚠️ Face {index} ignorada por ser muito pequena (w={w}, h={h})")
+#        return True
+#    if not (facial_area.get("left_eye") and facial_area.get("right_eye")):
+#        print(f"⚠️ Face {index} ignorada por falta dos landmarks dos dois olhos.")
+#        return True
+#    return False
 
 # ----------------------------------------
 # Processa e envia cada face para o MinIO
